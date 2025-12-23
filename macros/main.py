@@ -1,7 +1,9 @@
-"""Macros for rendering section link cards in MkDocs pages."""
+"""Macros for rendering section link cards in MkDocs pages, plus light validation."""
 from __future__ import annotations
 
 from typing import Iterable, Tuple
+
+import logging
 
 from mkdocs.structure.nav import Section
 from mkdocs.structure.pages import Page
@@ -97,3 +99,85 @@ def define_env(env):
         lines.append("</div>")
 
         return "\n".join(lines)
+
+
+def _index_page(section: Section) -> Page | None:
+    """Return the index page for a section, if any."""
+    return next(
+        (child for child in section.children if getattr(child, "is_page", False) and getattr(child, "is_index", False)),
+        None,
+    )
+
+
+def _get_weight(item, config) -> int | None:
+    """Extract weight metadata for a page or section index."""
+    page = None
+    if getattr(item, "is_page", False):
+        page = item
+    elif getattr(item, "is_section", False):
+        page = _index_page(item)
+
+    if page is None:
+        return None
+
+    page.read_source(config)
+    meta = getattr(page, "meta", {}) or {}
+    weight = meta.get("weight")
+    return weight if isinstance(weight, (int, float)) else None
+
+
+def _apply_sidebar_weight(item, config) -> None:
+    """Populate weight from sidebar_position if weight is missing."""
+    page = None
+    if getattr(item, "is_page", False):
+        page = item
+    elif getattr(item, "is_section", False):
+        page = _index_page(item)
+
+    if page is None:
+        return
+
+    page.read_source(config)
+    meta = getattr(page, "meta", {}) or {}
+    if "weight" not in meta and "sidebar_position" in meta:
+        val = meta["sidebar_position"]
+        if isinstance(val, (int, float, str)):
+            text = str(val)
+            if text.lstrip("-").replace(".", "", 1).isdigit():
+                meta["weight"] = int(val) if text.isdigit() else float(text)
+                page.meta = meta
+
+
+def _warn_conflicts(items: list, parent_label: str, config) -> None:
+    """Emit warnings for duplicate weights among sibling items."""
+    weights: dict[int | float, list[str]] = {}
+    for child in items:
+        _apply_sidebar_weight(child, config)
+        weight = _get_weight(child, config)
+        if weight is None:
+            continue
+        title = getattr(child, "title", "Untitled")
+        weights.setdefault(weight, []).append(title)
+
+    for weight, titles in weights.items():
+        if len(titles) > 1:
+            logging.warning(
+                "[nav-weight] Duplicate weight %s under '%s' for: %s",
+                weight,
+                parent_label or "root",
+                ", ".join(titles),
+            )
+
+
+def _walk_sections(items: list, parent_label: str, config) -> None:
+    """Traverse nav to find duplicate weights per sibling group."""
+    _warn_conflicts(items, parent_label, config)
+    for child in items:
+        if getattr(child, "is_section", False):
+            _walk_sections(child.children, child.title or parent_label, config)
+
+
+def on_nav(nav, config, files):
+    """Warn if siblings share the same weight."""
+    _walk_sections(nav.items, "root", config)
+    return nav
