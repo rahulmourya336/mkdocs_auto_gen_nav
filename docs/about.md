@@ -1,6 +1,7 @@
 ---
 title: About
 weight: 5
+description: Background and context for the project.
 ---
 
 # Trahar in orbis

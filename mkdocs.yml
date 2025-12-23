@@ -4,6 +4,9 @@ theme: material
 plugins:
   - search
   - mkdocs-nav-weight
+  - macros:
+      modules:
+        - macros.main
 
 markdown_extensions:
   - toc:

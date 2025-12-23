@@ -1,11 +1,16 @@
 ---
 title: Docs
 weight: 1
+description: Entry point to the documentation and quick links.
 ---
 
 # Welcome to MkDocs
 
 For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+
+## Browse sections
+
+{{ section_cards(include_index=False) }}
 
 ## Commands
 

@@ -1,3 +1,4 @@
 mkdocs>=1.5
 mkdocs-material
 mkdocs-nav-weight
+mkdocs-macros-plugin
