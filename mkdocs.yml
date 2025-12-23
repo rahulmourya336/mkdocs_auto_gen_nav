@@ -3,15 +3,12 @@ theme: material
 
 plugins:
   - search
-  - gen-files:
-      scripts:
-        - gen_pages.py
+  - mkdocs-nav-weight
 
 markdown_extensions:
   - toc:
       permalink: "#"
       separator: "_"
 
-# NOTE: nav is auto-generated from front-matter metadata
-# Do NOT edit nav; it will be overridden
+# Navigation is driven by mkdocs-nav-weight
 nav: []

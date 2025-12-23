@@ -1,6 +1,6 @@
 ---
-title: About Us
-order: 2
+title: About
+weight: 5
 ---
 
 # Trahar in orbis

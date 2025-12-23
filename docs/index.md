@@ -1,6 +1,6 @@
 ---
-title: Overview
-order: 1
+title: Docs
+weight: 1
 ---
 
 # Welcome to MkDocs

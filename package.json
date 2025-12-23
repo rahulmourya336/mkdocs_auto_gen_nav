@@ -1,0 +1,9 @@
+{
+  "name": "mkdocs-site",
+  "private": true,
+  "scripts": {
+    "docs:serve": "python -m mkdocs serve -f mkdocs.yml --dev-addr=localhost:8000 --livereload --dirtyreload",
+    "docs:build": "python -m mkdocs build -f mkdocs.yml",
+    "docs:check": "python -m mkdocs build -f mkdocs.yml --strict"
+  }
+}
