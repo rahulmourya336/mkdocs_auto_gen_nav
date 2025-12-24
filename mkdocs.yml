@@ -3,6 +3,7 @@ theme:
   name: material
   features:
     - navigation.path
+    - toc.follow
 
 plugins:
   - search

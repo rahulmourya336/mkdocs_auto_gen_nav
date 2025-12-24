@@ -131,7 +131,6 @@ def define_env(env):
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1rem;
-  margin: 1.5rem 0;
 }
 .section-card {
   display: flex;
