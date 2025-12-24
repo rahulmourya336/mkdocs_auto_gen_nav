@@ -1,60 +1,69 @@
-# MkDocs Auto Navigation (weight-based, no manual nav edits)
+# MkDocs auto navigation (weight-based)
 
-Navigation is built directly from the `docs/` folder; ordering is controlled with a `weight` field in each page's front matter via `mkdocs-nav-weight`.
+Navigation is generated directly from the `docs/` folder using `mkdocs-nav-weight` plus a tiny macros helper. Keep `nav:` empty in `mkdocs.yml`; ordering comes from page metadata.
 
 ## Prerequisites
-
 ```bash
-pip install mkdocs mkdocs-material mkdocs-nav-weight
+pip install -r requirements.txt
+# or
+pip install mkdocs mkdocs-material mkdocs-nav-weight mkdocs-macros-plugin
 ```
 
-## How it works
-- Leave `nav:` empty in `mkdocs.yml`; MkDocs builds the nav from the folder tree.
-- Ordering is controlled per page by a `weight` field in the YAML front matter; lower numbers appear first. Pages without `weight` are ordered alphabetically after weighted items.
-- Page titles come from the first Markdown heading (fallback: filename).
+## Navigation rules
+- Use front matter `weight` to order siblings (lower = earlier). Items without a weight are alphabetical after weighted ones.
+- `sidebar_position` is also accepted and normalized to `weight` by the macro shim.
+- Duplicate weights among siblings emit warnings during the build; check the terminal output.
+- Titles come from the first Markdown heading; descriptions can be set with a `description` field.
 
 ### Example front matter
 ```yaml
 ---
 title: Overview
 weight: 1
+description: High-level entry point for the docs site.
 ---
 ```
 
-## Usage
-1) Add or edit Markdown files anywhere under `docs/`.
-2) Serve or build:
-   ```bash
-   python -m mkdocs serve -f mkdocs.yml
-   # or
-   python -m mkdocs build -f mkdocs.yml
-   ```
-3) The sidebar updates automatically based on the current folder structure and `weight` values.
-
-### npm-style shortcuts
-`package.json` includes scripts so you can use familiar npm commands (requires Python + mkdocs installed):
+## Developing locally
 ```bash
-npm run docs:serve   # live reload
-npm run docs:build   # production build
-npm run docs:check   # strict build (fails on warnings)
+python -m mkdocs serve -f mkdocs.yml --dev-addr=localhost:8000
 ```
 
-## Project layout (example)
+## Builds and checks
+```bash
+python -m mkdocs build -f mkdocs.yml        # production build
+python -m mkdocs build -f mkdocs.yml --strict  # fail on warnings
+```
+
+### npm-style scripts (require Python + mkdocs installed)
+```bash
+npm run predev   # clean ./site
+npm run dev      # live reload dev server
+npm run build    # production build
+npm run check    # strict build (warnings fail)
+```
+
+## Current layout
 ```
 docs/
-  mkdocs.yml
-  README.md
-  index.md
-  about.md
+  AMB/
+    index.md
   ECM/
     index.md
   Make Call/
     index.md
+    design.md
     Make Call details/
+      index.md
+    Make call archiecture/
       index.md
 ```
 
 ## Notes
-- No helper script is needed; `gen_pages.py` has been removed.
-- `.pages` files are not used; ordering comes from `weight` in front matter.
-- Keep `nav:` empty in `mkdocs.yml`; MkDocs + `mkdocs-nav-weight` manage navigation.
+- `.pages` files are not used; ordering comes from `weight` (or `sidebar_position`) in front matter.
+- Section landing cards are provided by the `section_cards` macro (see below).
+
+## Section landing cards
+- Add `{{ section_cards() }}` to any section index page to render direct children as cards.
+- Pages show their title and `description` (from front matter); folders show their title and the number of immediate child items.
+- Cards link to the child page/section and use the site color tokens for styling; no extra assets are required.

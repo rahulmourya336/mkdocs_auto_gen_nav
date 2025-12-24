@@ -5,4 +5,4 @@ description: Make Call workflow and related guides.
 ---
 # Make call
 
-{{ section_cards(include_index=False) }}
+{{ section_cards() }}

@@ -1,31 +1,32 @@
-"""Macros for rendering section link cards in MkDocs pages, plus light validation."""
+"""Macros for card navigation and weight validation (weight/sidebar_position)."""
 from __future__ import annotations
 
-from typing import Iterable, Tuple
-
 import logging
+from typing import Iterable, Tuple
 
 from mkdocs.structure.nav import Section
 from mkdocs.structure.pages import Page
 
 
+# ---------------------------------------------------------------------------
+# Card helpers
+# ---------------------------------------------------------------------------
+
 def _page_info(page: Page, config) -> Tuple[str, str, str] | None:
     """Return (title, url, description) for a page."""
-    if page.url is None and page.abs_url is None:
+    url = page.abs_url or page.url
+    if url is None:
         return None
-    # Ensure meta is populated
     if not getattr(page, "meta", None):
         page.read_source(config)
     desc = ""
     if isinstance(page.meta, dict):
         desc = page.meta.get("description", "") or ""
-    url = page.abs_url or page.url
     return page.title, url, desc
 
 
 def _link_for_section(section: Section, config) -> Tuple[str, str, str] | None:
-    """Return (title, url, description) for a section using its index page if available."""
-    # Prefer an index page; fallback to first page child.
+    """Return (title, url, description) using the section's index if available."""
     target = next(
         (child for child in section.children if getattr(child, "is_page", False) and getattr(child, "is_index", False)),
         None,
@@ -41,65 +42,139 @@ def _link_for_section(section: Section, config) -> Tuple[str, str, str] | None:
     return section.title or title, url, desc
 
 
-def _section_items(section: Section, config) -> Iterable[Tuple[str, str, str]]:
-    """Yield (title, url, description) for direct children of a section."""
-    for child in section.children:
-        if getattr(child, "is_page", False):
-            if getattr(child, "is_index", False):
-                continue
-            info = _page_info(child, config)
-            if info:
-                yield info
-        elif getattr(child, "is_section", False):
-            link = _link_for_section(child, config)
-            if link:
-                yield link
+def _item_info(item, config):
+    """Return (title, url, description) for either a page or a section."""
+    if getattr(item, "is_page", False):
+        return _page_info(item, config)
+    if getattr(item, "is_section", False):
+        return _link_for_section(item, config)
+    return None
+
+
+def _section_for_page(nav, page) -> Section | None:
+    """Return the nav section whose index page matches the current page."""
+    def _walk(items):
+        for item in items:
+            if getattr(item, "is_section", False):
+                idx = _index_page(item)
+                if idx and idx.file == page.file:
+                    return item
+                found = _walk(item.children)
+                if found:
+                    return found
+        return None
+
+    return _walk(nav.items if nav else [])
+
+
+def _count_children(section: Section) -> int:
+    """Count direct child items (pages + subsections), including the index page."""
+    return len(section.children)
 
 
 def define_env(env):
     """MkDocs-macros entrypoint."""
 
     @env.macro
-    def section_cards(include_index: bool = False) -> str:
-        """
-        Render cards for the current section's immediate children.
-
-        - include_index: whether to include the section index page itself (default: False)
-        """
-        page: Page | None = env.variables.get("page")
-        if page is None:
-            return ""
-
-        # Use parent section for index pages; otherwise use the page's section.
-        section = page.parent if page.is_page else None
-        if section is None:
-            return ""
-
+    def section_cards() -> str:
+        """Render direct children of the current section as cards (page description or child count)."""
+        nav = env.variables.get("nav")
+        page = env.variables.get("page")
         config = env.variables.get("config")
-        items = list(_section_items(section, config))
-        if include_index and page.url:
-            desc = ""
-            if isinstance(getattr(page, "meta", None), dict):
-                desc = page.meta.get("description", "") or ""
-            items = [(page.title, page.url, desc)] + items
-
-        if not items:
+        if not page:
             return ""
 
-        # Render as Material grid cards using plain HTML.
-        lines = ['<div class="grid cards">']
-        for title, url, desc in items:
-            lines.append(
-                f'  <a class="card" href="{url}">'
-                f'<span class="md-ellipsis">{title}</span>'
-                f'<p class="md-typeset__text" style="color:#555;font-size:0.85em;margin:0;">'
-                f'{desc} <span aria-hidden="true">→</span></p>'
-                f"</a>"
+        parent = getattr(page, "parent", None)
+        section = parent if getattr(parent, "is_section", False) else _section_for_page(nav, page) if nav else None
+        if not section:
+            return ""
+
+        cards = []
+        for child in section.children:
+            if getattr(child, "is_page", False) and getattr(child, "is_index", False):
+                continue
+            if getattr(child, "is_page", False):
+                info = _page_info(child, config)
+                if not info:
+                    continue
+                title, url, desc = info
+                icon = "&#128196;"  # page icon
+                detail = desc
+            elif getattr(child, "is_section", False):
+                info = _link_for_section(child, config)
+                if not info:
+                    continue
+                title, url, _ = info
+                icon = "&#128193;"  # folder icon
+                detail = f"{_count_children(child)} item(s)"
+            else:
+                continue
+
+            cards.append(
+                f"""
+                <a class="section-card" href="{url}">
+                  <div class="section-card__icon">{icon}</div>
+                  <div class="section-card__body">
+                    <div class="section-card__title">{title}</div>
+                    <div class="section-card__desc">{detail or ""}</div>
+                  </div>
+                </a>
+                """
             )
-        lines.append("</div>")
 
-        return "\n".join(lines)
+        if not cards:
+            return ""
 
+        style = """
+<style id="section-cards-style">
+.section-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.section-card {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  text-decoration: none;
+  background: var(--md-code-bg-color, #1f2937);
+  border: 1px solid var(--md-default-fg-color--lighter, #2d3748);
+  color: var(--md-default-fg-color, #e5e7eb);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.section-card:hover {
+  border-color: var(--md-accent-fg-color, #5e81ac);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.18);
+  transform: translateY(-2px);
+}
+.section-card__icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.section-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.section-card__title {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--md-default-fg-color, #e5e7eb);
+}
+.section-card__desc {
+  color: var(--md-default-fg-color--light, #cbd5e1);
+  font-size: 0.6375rem;
+}
+</style>
+"""
+        return style + f'<div class="section-cards-grid">{"".join(cards)}</div>'
+
+
+# ---------------------------------------------------------------------------
+# Weight helpers and duplicate warnings (mkdocs-nav-weight compatibility)
+# ---------------------------------------------------------------------------
 
 def _index_page(section: Section) -> Page | None:
     """Return the index page for a section, if any."""
@@ -111,15 +186,9 @@ def _index_page(section: Section) -> Page | None:
 
 def _get_weight(item, config) -> int | None:
     """Extract weight metadata for a page or section index."""
-    page = None
-    if getattr(item, "is_page", False):
-        page = item
-    elif getattr(item, "is_section", False):
-        page = _index_page(item)
-
+    page = item if getattr(item, "is_page", False) else _index_page(item) if getattr(item, "is_section", False) else None
     if page is None:
         return None
-
     page.read_source(config)
     meta = getattr(page, "meta", {}) or {}
     weight = meta.get("weight")
@@ -128,12 +197,7 @@ def _get_weight(item, config) -> int | None:
 
 def _apply_sidebar_weight(item, config) -> None:
     """Populate weight from sidebar_position if weight is missing."""
-    page = None
-    if getattr(item, "is_page", False):
-        page = item
-    elif getattr(item, "is_section", False):
-        page = _index_page(item)
-
+    page = item if getattr(item, "is_page", False) else _index_page(item) if getattr(item, "is_section", False) else None
     if page is None:
         return
 
