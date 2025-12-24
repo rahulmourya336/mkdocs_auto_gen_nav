@@ -1,8 +1,8 @@
 ---
-title: AMB
+title: Intro
 weight: 2
 description: App Message Bridge overview and resources.
 ---
-# APP Message Bridge
+# AMB Sections
 
 {{ section_cards() }}

@@ -1,5 +1,8 @@
 site_name: Organization Documentation
-theme: material
+theme:
+  name: material
+  features:
+    - navigation.path
 
 plugins:
   - search

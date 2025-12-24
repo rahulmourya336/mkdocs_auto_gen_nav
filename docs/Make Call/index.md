@@ -1,8 +1,8 @@
 ---
-title: Make Call
+title: Intro
 weight: 3
 description: Make Call workflow and related guides.
 ---
-# Make call
+# Sections
 
 {{ section_cards() }}
